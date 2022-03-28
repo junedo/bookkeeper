@@ -1,5 +1,4 @@
 /**
- *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -8,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -16,13 +15,11 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.bookkeeper.bookie;
 
 import com.google.common.util.concurrent.RateLimiter;
-
 import org.apache.bookkeeper.conf.ServerConfiguration;
 
 /**
@@ -32,11 +29,6 @@ public abstract class AbstractLogCompactor {
 
     protected final ServerConfiguration conf;
     protected final Throttler throttler;
-
-    interface LogRemovalListener {
-        void removeEntryLog(long logToRemove);
-    }
-
     protected final LogRemovalListener logRemovalListener;
 
     public AbstractLogCompactor(ServerConfiguration conf, LogRemovalListener logRemovalListener) {
@@ -47,6 +39,7 @@ public abstract class AbstractLogCompactor {
 
     /**
      * Compact entry log file.
+     *
      * @param entryLogMeta log metadata for the entry log to be compacted
      * @return true for succeed
      */
@@ -55,14 +48,21 @@ public abstract class AbstractLogCompactor {
     /**
      * Do nothing by default. Intended for subclass to override this method.
      */
-    public void cleanUpAndRecover() {}
+    public void cleanUpAndRecover() {
+    }
+
+    interface LogRemovalListener {
+        void removeEntryLog(long logToRemove);
+    }
 
     static class Throttler {
         private final RateLimiter rateLimiter;
-        private final boolean isThrottleByBytes;
+        private final ServerConfiguration conf;
+        private boolean isThrottleByBytes;
 
         Throttler(ServerConfiguration conf) {
-            this.isThrottleByBytes  = conf.getIsThrottleByBytes();
+            this.conf = conf;
+            this.isThrottleByBytes = conf.getIsThrottleByBytes();
             this.rateLimiter = RateLimiter.create(this.isThrottleByBytes
                 ? conf.getCompactionRateByBytes() : conf.getCompactionRateByEntries());
         }
@@ -70,6 +70,18 @@ public abstract class AbstractLogCompactor {
         // acquire. if bybytes: bytes of this entry; if byentries: 1.
         void acquire(int permits) {
             rateLimiter.acquire(this.isThrottleByBytes ? permits : 1);
+        }
+
+        // reset rate of limiter before compact one entry log file
+        void resetRate() {
+            this.isThrottleByBytes = conf.getIsThrottleByBytes();
+            this.rateLimiter.setRate(this.isThrottleByBytes
+                ? conf.getCompactionRateByBytes() : conf.getCompactionRateByEntries());
+        }
+
+        // get rate of limiter for unit test
+        double getRate() {
+            return this.rateLimiter.getRate();
         }
     }
 

@@ -1,5 +1,4 @@
 /**
- *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -8,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -16,17 +15,14 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.bookkeeper.bookie;
 
 import io.netty.buffer.ByteBuf;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,10 +41,10 @@ public class EntryLogCompactor extends AbstractLogCompactor {
     private final int maxOutstandingRequests;
 
     public EntryLogCompactor(
-            ServerConfiguration conf,
-            EntryLogger entryLogger,
-            CompactableLedgerStorage ledgerStorage,
-            LogRemovalListener logRemover) {
+        ServerConfiguration conf,
+        EntryLogger entryLogger,
+        CompactableLedgerStorage ledgerStorage,
+        LogRemovalListener logRemover) {
         super(conf, logRemover);
         this.maxOutstandingRequests = conf.getCompactionMaxOutstandingRequests();
         this.entryLogger = entryLogger;
@@ -58,10 +54,14 @@ public class EntryLogCompactor extends AbstractLogCompactor {
     @Override
     public boolean compact(EntryLogMetadata entryLogMeta) {
         try {
+            long start = System.currentTimeMillis();
+            throttler.resetRate();
             entryLogger.scanEntryLog(entryLogMeta.getEntryLogId(),
                 scannerFactory.newScanner(entryLogMeta));
+            long scan = System.currentTimeMillis();
             scannerFactory.flush();
-            LOG.info("Removing entry log {} after compaction", entryLogMeta.getEntryLogId());
+            LOG.info("Removing entry log {} after compaction, scan {}ms ,flush {}ms",
+                entryLogMeta.getEntryLogId(), scan - start, System.currentTimeMillis() - scan);
             logRemovalListener.removeEntryLog(entryLogMeta.getEntryLogId());
         } catch (LedgerDirsManager.NoWritableLedgerDirException nwlde) {
             LOG.warn("No writable ledger directory available, aborting compaction", nwlde);
